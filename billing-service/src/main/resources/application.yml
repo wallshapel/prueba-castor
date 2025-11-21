@@ -3,7 +3,7 @@ spring:
     name: billing-service
 
   profiles:
-    active: dev   # Por defecto, desarrollo
+    active: prod   
 
 server:
   port: 8081
