@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    # === POSTGRES (Clientes) ===
+    primary:
+      url: jdbc:postgresql://localhost:5432/castor_customers
+      username: castor_user
+      password: "Castor2025*"
+      driver-class-name: org.postgresql.Driver
+
+    # === ORACLE (Facturas) ===
+    oracle:
+      url: jdbc:oracle:thin:@localhost:1521/XEPDB1
+      username: CASTOR_BILLING
+      password: "Castor2025*"
+      driver-class-name: oracle.jdbc.OracleDriver
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: DEBUG     # Ver queries para debug
+    org.hibernate.type: TRACE    # Ver valores de parámetros
+
+castor:
+  db:
+    postgres:
+      name: castor_customers
+    oracle:
+      pdb: XEPDB1
+
+external-services:
+  invoice-calculator:
+    url: http://localhost:5001/calculate   # dev

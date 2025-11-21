@@ -1,0 +1,55 @@
+# =======================================
+#   ARCHIVOS A IGNORAR EN SPRING BOOT
+# =======================================
+
+# Build output
+target/
+build/
+
+# Maven wrapper binaries
+.mvn/wrapper/maven-wrapper.jar
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environments
+*.env
+*.env.*
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VS Code
+.vscode/
+
+# Eclipse / STS
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache
+.apt_generated
+.factorypath
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# =======================================
+#   EXCEPCIONES
+#   (Permitir builds dentro de src)
+# =======================================
+!**/src/main/**/build/
+!**/src/test/**/build/
+!**/src/main/**/target/
+!**/src/test/**/target/

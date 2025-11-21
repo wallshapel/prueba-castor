@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: billing-service-config
+  namespace: default
+
+data:
+  POSTGRES_HOST: "postgresql"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "castor_customers"
+
+  ORACLE_HOST: "oracle-db"
+  ORACLE_PORT: "1521"
+  ORACLE_PDB: "XEPDB1"
+
+  PYTHON_CALCULATOR_URL: "http://invoice-calculator:5001/calculate"

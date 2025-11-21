@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: billing-service
+
+  profiles:
+    active: dev   # Por defecto, desarrollo
+
+server:
+  port: 8081
+
+logging:
+  level:
+    root: INFO
+
+castor:
+  billing:
+    module-enabled: true

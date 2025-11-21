@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invoice-calculator
+  namespace: default
+  labels:
+    app: invoice-calculator
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: invoice-calculator
+
+  template:
+    metadata:
+      labels:
+        app: invoice-calculator
+
+    spec:
+      containers:
+        - name: invoice-calculator
+          image: invoice-calculator:latest
+          imagePullPolicy: Never
+
+          ports:
+            - containerPort: 5001

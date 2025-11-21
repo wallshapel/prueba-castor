@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: oracle-db
+  namespace: default
+
+spec:
+  serviceName: oracle-db
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: oracle-db
+
+  template:
+    metadata:
+      labels:
+        app: oracle-db
+
+    spec:
+      containers:
+        - name: oracle
+          image: gvenzl/oracle-xe:latest
+
+          ports:
+            - containerPort: 1521
+            - containerPort: 8080
+
+          env:
+            # contraseña del usuario SYSTEM
+            - name: ORACLE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-secret
+                  key: ORACLE_PASSWORD
+
+            # usuario de aplicación
+            - name: APP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-secret
+                  key: ORACLE_USER
+
+            - name: APP_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-secret
+                  key: ORACLE_USER_PASSWORD
+
+          volumeMounts:
+            - name: oracle-data
+              mountPath: /opt/oracle/oradata
+
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+
+      volumes:
+        - name: init-sql
+          configMap:
+            name: oracle-init-sql
+
+  volumeClaimTemplates:
+    - metadata:
+        name: oracle-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
