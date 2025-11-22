@@ -1,0 +1,16 @@
+# k8s/pv-oracle.yaml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: oracle-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  storageClassName: oracle-storage
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /mnt/data/oracle

@@ -1,0 +1,208 @@
+# k8s/deployments.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:latest
+        ports:
+        - containerPort: 5432
+        env:
+        # Usuario raíz por defecto: postgres
+        # La imagen usa siempre "postgres" si no se define POSTGRES_USER.
+        # Solo pasamos la contraseña del superusuario.
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: POSTGRES_ROOT_PASSWORD   # <- la crearemos/liga­remos en secrets.yaml
+        # No definimos POSTGRES_DB aquí: la DB castor_customers la creará el Job
+        volumeMounts:
+        - name: postgresql-storage
+          mountPath: /var/lib/postgresql/data   # ruta estándar de la imagen
+      volumes:
+      - name: postgresql-storage
+        persistentVolumeClaim:
+          claimName: postgresql-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oracle-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oracle-db
+  template:
+    metadata:
+      labels:
+        app: oracle-db
+    spec:
+      containers:
+      - name: oracle-db
+        image: gvenzl/oracle-xe:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 1521
+        - containerPort: 8080
+        env:
+        - name: ORACLE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: ORACLE_PASSWORD   # SYSTEM / SYS = Castor2025*
+        - name: ORACLE_PDB
+          value: "XEPDB1"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+        volumeMounts:
+        - name: oracle-storage
+          mountPath: /opt/oracle/oradata
+      volumes:
+      - name: oracle-storage
+        persistentVolumeClaim:
+          claimName: oracle-pvc
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invoice-calculator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: invoice-calculator
+  template:
+    metadata:
+      labels:
+        app: invoice-calculator
+    spec:
+      containers:
+      - name: invoice-calculator
+        image: invoice-calculator:latest
+        imagePullPolicy: Never  # usa imagen local
+        ports:
+        - containerPort: 5001
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: billing-service
+  template:
+    metadata:
+      labels:
+        app: billing-service
+    spec:
+      # INIT CONTAINERS: esperan a que las DB acepten conexiones TCP
+      initContainers:
+      - name: wait-for-databases
+        image: busybox:1.35
+        command: 
+        - 'sh'
+        - '-c'
+        - |
+          echo "Waiting for databases to be ready..."
+          until nc -z postgresql 5432; do echo "Waiting for PostgreSQL..."; sleep 10; done;
+          until nc -z oracle-db 1521; do echo "Waiting for Oracle..."; sleep 30; done;
+          echo "All databases are ready!"
+      
+      containers:
+      - name: billing-service
+        image: billing-service:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8081
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: SPRING_PROFILES_ACTIVE
+
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: POSTGRES_HOST
+        - name: POSTGRES_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: POSTGRES_PORT
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: POSTGRES_DB
+
+        # Usuario de aplicación para PostgreSQL: castor_user
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: POSTGRES_APP_USER      # <- lo definiremos en secrets.yaml como "castor_user"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: POSTGRES_APP_PASSWORD  # <- "Castor2025*"
+
+        - name: ORACLE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: ORACLE_HOST
+        - name: ORACLE_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: ORACLE_PORT
+        - name: ORACLE_PDB
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: ORACLE_PDB
+
+        # Usuario de aplicación para Oracle: CASTOR_BILLING
+        - name: ORACLE_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: ORACLE_USER            # <- será CASTOR_BILLING
+        - name: ORACLE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: ORACLE_PASSWORD        # <- Castor2025*
+
+        - name: PYTHON_CALCULATOR_URL
+          valueFrom:
+            configMapKeyRef:
+              name: billing-config
+              key: PYTHON_CALCULATOR_URL

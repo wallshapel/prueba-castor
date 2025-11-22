@@ -1,0 +1,14 @@
+# k8s/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: billing-config
+data:
+  SPRING_PROFILES_ACTIVE: "prod"
+  POSTGRES_DB: "castor_customers"
+  POSTGRES_HOST: "postgresql"
+  POSTGRES_PORT: "5432"
+  ORACLE_PDB: "XEPDB1"
+  ORACLE_HOST: "oracle-db"
+  ORACLE_PORT: "1521"
+  PYTHON_CALCULATOR_URL: "http://invoice-calculator:5001/calculate"

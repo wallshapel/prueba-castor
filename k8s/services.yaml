@@ -1,0 +1,56 @@
+# k8s/services.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-service
+spec:
+  selector:
+    app: billing-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: invoice-calculator
+spec:
+  selector:
+    app: invoice-calculator
+  ports:
+    - port: 5001
+      targetPort: 5001
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+spec:
+  selector:
+    app: postgresql
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle-db
+spec:
+  selector:
+    app: oracle-db
+  ports:
+    - name: oracle-db-port
+      port: 1521
+      targetPort: 1521
+    - name: oracle-http-port  
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

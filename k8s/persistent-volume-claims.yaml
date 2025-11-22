@@ -1,0 +1,25 @@
+# k8s/persistent-volume-claims.yaml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: oracle-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: oracle-storage
+  resources:
+    requests:
+      storage: 20Gi

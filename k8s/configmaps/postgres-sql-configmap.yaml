@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+data:
+  init.sql: |
+    CREATE USER castor_user WITH PASSWORD 'Castor2025*';
+    CREATE DATABASE castor_customers OWNER castor_user;
+
+    \c castor_customers;
+
+    CREATE TABLE public.customers (
+        id uuid PRIMARY KEY,
+        active boolean,
+        email varchar(255),
+        name varchar(255)
+    );

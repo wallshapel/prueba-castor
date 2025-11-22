@@ -19,6 +19,7 @@ Thumbs.db
 # Environments
 *.env
 *.env.*
+src/main/resources/application-dev.yml
 
 # IDEs
 .idea/
