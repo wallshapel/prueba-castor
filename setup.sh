@@ -219,10 +219,23 @@ CREATE TABLE CASTOR_BILLING.INVOICES (
     TOTAL NUMBER(18,2) NOT NULL,
     CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Crear procedimiento almacenado para validar cliente
+CREATE OR REPLACE PROCEDURE CASTOR_BILLING.VALIDATE_CUSTOMER_EXISTS (
+    p_customer_id IN RAW
+)
+AS
+BEGIN
+    IF p_customer_id IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20001, 'El cliente es obligatorio');
+    END IF;
+END VALIDATE_CUSTOMER_EXISTS;
+/
+
 EOSQL
 "
 
-echo "✔️ Oracle inicializado (usuario, tabla, permisos)."
+echo "✔️ Oracle inicializado (usuario, tabla, procedimiento almacenado, permisos)."
 echo ""
 
 echo "============================================"
