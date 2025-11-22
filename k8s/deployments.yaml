@@ -31,7 +31,7 @@ spec:
         # No definimos POSTGRES_DB aquí: la DB castor_customers la creará el Job
         volumeMounts:
         - name: postgresql-storage
-          mountPath: /var/lib/postgresql/data   # ruta estándar de la imagen
+          mountPath: /var/lib/postgresql   # ruta estándar de la imagen
       volumes:
       - name: postgresql-storage
         persistentVolumeClaim:
@@ -64,7 +64,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: database-secrets
-              key: ORACLE_PASSWORD   # SYSTEM / SYS = Castor2025*
+              key: ORACLE_PASSWORD   # SYSTEM / SYS = Castor2025
         - name: ORACLE_PDB
           value: "XEPDB1"
         resources:
@@ -171,7 +171,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: database-secrets
-              key: POSTGRES_APP_PASSWORD  # <- "Castor2025*"
+              key: POSTGRES_APP_PASSWORD  # <- "Castor2025"
 
         - name: ORACLE_HOST
           valueFrom:
@@ -199,7 +199,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: database-secrets
-              key: ORACLE_PASSWORD        # <- Castor2025*
+              key: ORACLE_PASSWORD        # <- Castor2025
 
         - name: PYTHON_CALCULATOR_URL
           valueFrom:

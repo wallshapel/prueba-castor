@@ -1,196 +1,240 @@
-#!/usr/bin/env bash
-
-# setup.sh
-# Despliega todo el entorno: Minikube + Oracle + PostgreSQL + Jobs + Microservicios
-
-set -e  # si algo falla, el script se detiene
-
-echo ""
-echo "============================================"
-echo "     🚀 INICIANDO DESPLIEGUE COMPLETO       "
-echo "============================================"
-echo ""
-
-# ---------------------------------------
-# 0. Verificar que minikube existe/funciona
-# ---------------------------------------
-
-echo "🔍 Verificando estado de Minikube..."
-
-if ! command -v minikube >/dev/null 2>&1; then
-  echo "❌ Error: minikube no está instalado o no está en el PATH."
-  exit 1
-fi
-
-if ! minikube status >/dev/null 2>&1; then
-  echo "⚙️  Minikube no tiene un clúster activo. Creando uno nuevo..."
-  minikube start \
-    --driver=docker \
-    --cpus=6 \
-    --memory=12288 \
-    --disk-size=40g
-else
-  echo "✅ Minikube ya tiene un clúster. Asegurando que esté iniciado..."
-  minikube start >/dev/null 2>&1 || true
-fi
-
-echo "✔️ Minikube está listo."
-echo ""
-
-# ---------------------------------------
-# 1. Crear carpeta persistente para Oracle dentro de Minikube
-# ---------------------------------------
+#!/bin/bash
 
 echo "============================================"
-echo "   🟦 Preparando almacenamiento para Oracle  "
+echo "   🧹🛑 LIMPIANDO TODO ANTES DE INICIAR      "
 echo "============================================"
+
+echo "🔸 Deteniendo Minikube (si estaba corriendo)..."
+minikube stop >/dev/null 2>&1
+
+echo "🔸 Eliminando TODO el cluster de Minikube..."
+minikube delete --all --purge >/dev/null 2>&1
+
+echo "🔸 Limpiando variables de entorno de Docker..."
+eval "$(minikube docker-env -u 2>/dev/null)" >/dev/null 2>&1
+
+echo "🔸 Eliminando PV y PVC (si hubiera alguno colgado)..."
+kubectl delete pvc --all >/dev/null 2>&1
+kubectl delete pv --all  >/dev/null 2>&1
+
+echo "🔸 Eliminando volúmenes residuales del hostpath en Minikube..."
+minikube ssh "sudo rm -rf /var/lib/minikube/hostpath-provisioner/*" >/dev/null 2>&1
+
+echo "🔸 Eliminando carpeta persistente de Oracle si existía..."
+minikube ssh "sudo rm -rf /mnt/data/oracle" >/dev/null 2>&1
+
+echo "🔸 (Opcional) Limpiando /var/lib/minikube/data si existe..."
+minikube ssh "sudo rm -rf /var/lib/minikube/data" >/dev/null 2>&1
+
+echo "✔️ Sistema limpio (cluster, PVs, PVCs, hostpath, oracle-dir)."
 echo ""
 
-echo "🔧 Creando carpeta /mnt/data/oracle dentro del nodo Minikube..."
+echo "============================================"
+echo "   🚀 CREANDO NUEVO CLUSTER MINIKUBE        "
+echo "============================================"
+
+minikube start --cpus=6 --memory=12288 --addons=default-storageclass,storage-provisioner
+echo "✔️ Minikube iniciado."
+echo ""
+
+echo "============================================"
+echo "   🟦 PREPARANDO ALMACENAMIENTO ORACLE      "
+echo "============================================"
 
 minikube ssh "sudo mkdir -p /mnt/data/oracle && sudo chmod 777 /mnt/data/oracle"
-
-echo "✔️ Carpeta /mnt/data/oracle creada y con permisos 777."
+echo "✔️ Carpeta creada (/mnt/data/oracle)."
 echo ""
 
-# ---------------------------------------
-# 2. StorageClass + PV + PVC
-# ---------------------------------------
+echo "============================================"
+echo "   🐳 CONSTRUYENDO IMÁGENES SIN CACHÉ       "
+echo "============================================"
 
-echo "============================================"
-echo "     📦 Configurando Storage (PV / PVC)     "
-echo "============================================"
+echo "🔄 Enlazando Docker interno de Minikube..."
+eval "$(minikube docker-env)"
+
+echo "📦 Construyendo billing-service..."
+docker build --no-cache -t billing-service:latest ./billing-service
+
+echo "📦 Construyendo invoice-calculator..."
+docker build --no-cache -t invoice-calculator:latest ./python-ms
+
+echo "✔️ Imágenes construidas."
 echo ""
 
-echo "🔸 Aplicando StorageClass para Oracle..."
+echo "============================================"
+echo "     📦 APLICANDO STORAGE (PV / PVC)        "
+echo "============================================"
+
 kubectl apply -f k8s/storageclass-oracle.yaml
-
-echo "🔸 Aplicando PersistentVolume para Oracle..."
 kubectl apply -f k8s/pv-oracle.yaml
-
-echo "🔸 Aplicando PersistentVolumeClaims (PostgreSQL y Oracle)..."
 kubectl apply -f k8s/persistent-volume-claims.yaml
 
 echo "✔️ Storage configurado."
 echo ""
 
-# ---------------------------------------
-# 3. ConfigMaps y Secrets
-# ---------------------------------------
-
 echo "============================================"
-echo "      🔑 ConfigMaps y Secrets de DB         "
+echo "      🔑 CONFIGMAPS Y SECRETS               "
 echo "============================================"
-echo ""
 
-echo "🔸 Aplicando ConfigMap principal (billing-config)..."
 kubectl apply -f k8s/configmap.yaml
-
-echo "🔸 Aplicando ConfigMap con SQL de Oracle..."
-kubectl apply -f k8s/configmaps/oracle-sql-configmap.yaml
-
-echo "🔸 Aplicando ConfigMap con SQL de PostgreSQL..."
-kubectl apply -f k8s/configmaps/postgres-sql-configmap.yaml
-
-echo "🔸 Aplicando Secrets (credenciales de BD)..."
 kubectl apply -f k8s/secrets.yaml
 
-echo "✔️ ConfigMaps y Secrets aplicados."
+echo "✔️ ConfigMaps y Secrets listos."
 echo ""
 
-# ---------------------------------------
-# 4. Deployments + Services
-# ---------------------------------------
-
 echo "============================================"
-echo "         📡 Desplegando Deployments         "
+echo "         📡 DESPLEGANDO DEPLOYMENTS         "
 echo "============================================"
-echo ""
 
-echo "🔸 Aplicando Deployments (PostgreSQL, Oracle, servicios)..."
 kubectl apply -f k8s/deployments.yaml
-
-echo "🔸 Aplicando Services..."
 kubectl apply -f k8s/services.yaml
 
 echo "✔️ Deployments y Services aplicados."
 echo ""
 
-# ---------------------------------------
-# 5. Esperar a que PostgreSQL y Oracle estén listas
-# ---------------------------------------
+echo "============================================"
+echo "     ⏳ ESPERANDO A QUE POSTGRES SUBA       "
+echo "============================================"
+
+kubectl wait --for=condition=ready pod -l app=postgresql --timeout=240s
 
 echo "============================================"
-echo "        ⏳ Esperando bases de datos         "
+echo "     ⏳ ESPERANDO A QUE ORACLE SUBA         "
 echo "============================================"
-echo ""
 
-echo "⏳ Esperando a que el pod de PostgreSQL esté READY..."
-kubectl wait --for=condition=ready pod -l app=postgresql --timeout=180s
-
-echo "⏳ Esperando a que el pod de Oracle esté READY..."
-kubectl wait --for=condition=ready pod -l app=oracle-db --timeout=300s
-
-echo "✔️ Bases de datos listas para inicialización."
-echo ""
-
-# ---------------------------------------
-# 6. Ejecutar Jobs de inicialización SQL
-# ---------------------------------------
+kubectl wait --for=condition=ready pod -l app=oracle-db --timeout=240s
 
 echo "============================================"
-echo "    🧩 Ejecutando Jobs de inicialización    "
+echo " ⏳ ESPERANDO MENSAJE REAL DE 'READY' ORACLE"
 echo "============================================"
-echo ""
 
-echo "🔸 Aplicando Job de Oracle..."
-kubectl apply -f k8s/jobs/oracle-init-job.yaml
+ORACLE_POD=$(kubectl get pod -l app=oracle-db -o jsonpath='{.items[0].metadata.name}')
 
-echo "🔸 Aplicando Job de PostgreSQL..."
-kubectl apply -f k8s/jobs/postgres-init-job.yaml
+attempt=1
+max_attempts=60
 
-echo "⏳ Esperando a que el Job de Oracle termine..."
-kubectl wait --for=condition=complete job/oracle-init-job --timeout=180s
+while [ $attempt -le $max_attempts ]; do
+  if kubectl logs "$ORACLE_POD" 2>&1 | grep -q "DATABASE IS READY TO USE!"; then
+    echo "✅ Oracle realmente está listo (listener + PDB arriba)."
+    break
+  fi
 
-echo "⏳ Esperando a que el Job de PostgreSQL termine..."
-kubectl wait --for=condition=complete job/postgres-init-job --timeout=180s
+  echo "⏳ Intento $attempt/$max_attempts: aún no se ve el mensaje READY..."
+  sleep 5
+  attempt=$((attempt+1))
+done
 
-echo "✔️ Jobs de inicialización completados."
-echo ""
-
-# ---------------------------------------
-# 7. Verificación final
-# ---------------------------------------
+if [ $attempt -gt $max_attempts ]; then
+  echo "❌ Oracle NO mostró 'DATABASE IS READY TO USE!' a tiempo."
+  exit 1
+fi
 
 echo "============================================"
-echo "           🎉 DESPLIEGUE COMPLETO           "
+echo "   🔧 INICIALIZANDO POSTGRES (USUARIO/DB)   "
 echo "============================================"
+
+POSTGRES_POD=$(kubectl get pod -l app=postgresql -o jsonpath='{.items[0].metadata.name}')
+
+kubectl exec "$POSTGRES_POD" -- bash -c "cat <<'EOF' | psql -U postgres
+-- Limpieza previa por si quedó algo viejo
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = 'castor_customers';
+
+DROP DATABASE IF EXISTS castor_customers;
+DROP ROLE IF EXISTS castor_user;
+
+-- Crear usuario y base de datos de aplicación
+CREATE USER castor_user WITH PASSWORD 'Castor2025' CREATEDB;
+CREATE DATABASE castor_customers OWNER castor_user;
+
+-- Conectarnos a la nueva base
+\c castor_customers;
+
+-- Ajustar schema public
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT ALL ON SCHEMA public TO castor_user;
+ALTER SCHEMA public OWNER TO castor_user;
+
+-- Crear tabla de clientes
+CREATE TABLE public.customers (
+    id uuid PRIMARY KEY,
+    active boolean,
+    email varchar(255),
+    name varchar(255)
+);
+
+ALTER TABLE public.customers OWNER TO castor_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.customers TO castor_user;
+EOF
+"
+
+echo "✔️ PostgreSQL inicializado (usuario, DB, esquema, tabla, permisos)."
 echo ""
 
-echo "📋 Pods en el clúster:"
-kubectl get pods -o wide
+echo "============================================"
+echo "    🔧 INICIALIZANDO ORACLE (USUARIO/TABLA) "
+echo "============================================"
+
+# Obtener contraseña real desde el Secret
+ORACLE_PASS=$(kubectl get secret database-secrets -o jsonpath='{.data.ORACLE_PASSWORD}' | base64 -d)
+
+ORACLE_POD=$(kubectl get pod -l app=oracle-db -o jsonpath='{.items[0].metadata.name}')
+
+kubectl exec "$ORACLE_POD" -- bash -c "cat <<'EOSQL' | sqlplus -s sys/$ORACLE_PASS@localhost:1521/xepdb1 as sysdba
+-- Cambiar al PDB correcto
+ALTER SESSION SET CONTAINER = xepdb1;
+
+-- Borrar usuario si ya existía (evita ORA-01918)
+BEGIN
+    EXECUTE IMMEDIATE 'DROP USER CASTOR_BILLING CASCADE';
+EXCEPTION
+    WHEN OTHERS THEN
+        IF SQLCODE != -1918 THEN
+            RAISE;
+        END IF;
+END;
+/
+
+-- Crear usuario de aplicación
+CREATE USER CASTOR_BILLING IDENTIFIED BY \"Castor2025\" QUOTA UNLIMITED ON USERS;
+
+-- Permisos necesarios
+GRANT CREATE SESSION,
+       CREATE TABLE,
+       CREATE SEQUENCE,
+       CREATE TRIGGER,
+       CREATE VIEW,
+       CREATE PROCEDURE,
+       UNLIMITED TABLESPACE
+TO CASTOR_BILLING;
+
+-- Crear tabla INVOICES en su esquema
+CREATE TABLE CASTOR_BILLING.INVOICES (
+    ID RAW(16) DEFAULT SYS_GUID() PRIMARY KEY,
+    CUSTOMER_ID RAW(16) NOT NULL,
+    SUBTOTAL NUMBER(18,2) NOT NULL,
+    TAX NUMBER(18,2) NOT NULL,
+    DISCOUNT NUMBER(18,2) NOT NULL,
+    TOTAL NUMBER(18,2) NOT NULL,
+    CREATED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+EOSQL
+"
+
+echo "✔️ Oracle inicializado (usuario, tabla, permisos)."
 echo ""
 
-echo "📋 Services:"
-kubectl get svc
+echo "============================================"
+echo " 🔁 REINICIANDO BILLING-SERVICE (JDBC FRESCO)"
+echo "============================================"
+
+kubectl rollout restart deployment/billing-service
+kubectl rollout status deployment/billing-service --timeout=180s
+
+echo "✔️ Billing-service reiniciado."
 echo ""
 
-echo "👉 Para conectarte desde DBeaver:"
-echo ""
-echo "   PostgreSQL (dentro de Minikube):"
-echo "     kubectl port-forward svc/postgresql 15432:5432"
-echo "     Host: localhost"
-echo "     Port: 15432"
-echo "     DB:   castor_customers"
-echo "     User: castor_user"
-echo "     Pass: Castor2025*"
-echo ""
-echo "   Oracle XE (dentro de Minikube):"
-echo "     kubectl port-forward svc/oracle-db 15210:1521"
-echo "     Host: localhost"
-echo "     Port: 15210"
-echo "     Service: XEPDB1"
-echo "     User (app): CASTOR_BILLING / Castor2025*"
-echo "     User (admin): SYSTEM / Castor2025*"
-echo ""
-echo "🔥 Todo está listo."
+echo "============================================"
+echo "   🎉✔️ DESPLIEGUE COMPLETO Y EXITOSO        "
+echo "============================================"
