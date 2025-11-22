@@ -2,5 +2,5 @@ projectKey=castor-billing-service
 serverUrl=http://localhost:9000
 serverVersion=10.4.0.87286
 dashboardUrl=http://localhost:9000/dashboard?id=castor-billing-service
-ceTaskId=f8efa3aa-c8b4-46bb-8ae9-18c2f3b294a2
-ceTaskUrl=http://localhost:9000/api/ce/task?id=f8efa3aa-c8b4-46bb-8ae9-18c2f3b294a2
+ceTaskId=37d24e1c-fc5c-4443-9b59-a8ea6db95d12
+ceTaskUrl=http://localhost:9000/api/ce/task?id=37d24e1c-fc5c-4443-9b59-a8ea6db95d12
